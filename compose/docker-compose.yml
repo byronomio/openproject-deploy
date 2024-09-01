@@ -9,7 +9,8 @@ volumes:
 x-op-restart-policy: &restart_policy
   restart: unless-stopped
 x-op-image: &image
-  image: openproject/openproject:${TAG:-14-slim}
+  image: openproject/community:12
+
 x-op-app: &app
   <<: [*image, *restart_policy]
   environment:
@@ -26,8 +27,11 @@ x-op-app: &app
     IMAP_ENABLED: "${IMAP_ENABLED:-false}"
   volumes:
     - "${OPDATA:-opdata}:/var/openproject/assets"
+    - "${OPDATA:-opdata}:/var/"
+    - "./enterprise_token.rb app/models/enterprise_token.rb"
 
 services:
+
   db:
     image: postgres:13
     <<: *restart_policy
@@ -60,6 +64,29 @@ services:
     networks:
       - frontend
 
+  
+  code-server:
+    <<: *app
+    command: "./docker/prod/web"
+    image: codercom/code-server:latest
+
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "8084:8080"
+    environment:
+      PASSWORD: "GOOgle86!!"
+    restart: unless-stopped
+    depends_on:
+      - db
+      - cache
+      - seeder    
+    volumes:
+      - "${OPDATA:-opdata}:/var/openproject/assets"
+      - "${OPDATA:-opdata}:/var/"
+      - "./enterprise_token.rb:/app/models/enterprise_token.rb"
+
   web:
     <<: *app
     command: "./docker/prod/web"
@@ -78,6 +105,11 @@ services:
       timeout: 3s
       retries: 3
       start_period: 30s
+    volumes:
+      - "${OPDATA:-opdata}:/var/openproject/assets"
+      - "${OPDATA:-opdata}:/var/"
+      - "./enterprise_token.rb:/app/models/enterprise_token.rb"
+
 
   autoheal:
     image: willfarrell/autoheal:1.2.0
